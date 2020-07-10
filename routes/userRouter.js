@@ -2,13 +2,14 @@ const router = require('express').Router();
 const User = require('../models/userModel');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const auth = require('../middleware/auth');
 // user test route
 
 router.get('/test', (req, res) => {
 	res.send("Hello it's working");
 });
 
-// register user
+// register user - public route
 router.post('/register', async (req, res) => {
 	try {
 		let { email, password, passwordCheck, displayName } = req.body;
@@ -55,7 +56,7 @@ router.post('/register', async (req, res) => {
 	}
 });
 
-// login user
+// login user - public route
 router.post('/login', async (req, res) => {
 	try {
 		const { email, password } = req.body;
@@ -93,6 +94,44 @@ router.post('/login', async (req, res) => {
 	} catch (err) {
 		res.status(500).json({ error: err.message });
 	}
+});
+
+// delete logged in user - private route
+router.delete('/delete', auth, async (req, res) => {
+	// console.log(req.user);
+	try {
+		const deletedUser = await User.findByIdAndDelete(req.user);
+		res.json(deletedUser);
+	} catch (err) {
+		res.status(500).json({ error: err.message });
+	}
+});
+
+// check token is valid route
+router.post('/tokenIsValid', async (req, res) => {
+	try {
+		const token = req.header('x-auth-token');
+		if (!token) return res.json(false);
+
+		const verified = jwt.verify(token, process.env.JWT_SECRET);
+		if (!verified) return res.json(false);
+
+		const user = await User.findById(verified.id);
+		if (!user) return res.json(false);
+
+		return res.json(true);
+	} catch (err) {
+		res.status(500).json({ error: err.message });
+	}
+});
+
+// get current logged in user
+router.get('/', auth, async (req, res) => {
+	const user = await User.findById(req.user);
+	res.json({
+		displayName: user.displayName,
+		id: user._id,
+	});
 });
 
 module.exports = router;
